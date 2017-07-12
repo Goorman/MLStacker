@@ -9,6 +9,7 @@ from sklearn.model_selection import StratifiedKFold
 from tqdm import tqdm_notebook
 from tqdm import tqdm
 from lightgbm import LGBMClassifier
+from sklearn.decomposition import TruncatedSVD
 
 
 #------------------------------------------------------------------------------------------------
@@ -465,7 +466,7 @@ class additive_stacking():
     def transform(self, test):
         new_test = test.copy()
         
-        for feature_name in self.__info__:
+        for feature_name in tqdm_notebook(self.__info__):
             features = self.__info__[feature_name]
             new_test[feature_name] = self.transformers[feature_name].predict_proba(new_test[features])[:,1]
 
@@ -511,7 +512,7 @@ class additive_featuring():
     def transform(self, test):
         new_test = test.copy()
         
-        for feature_name in self.__info__:
+        for feature_name in tqdm_notebook(self.__info__):
             features = self.__info__[feature_name]
             new_test[feature_name] = self.transformers[feature_name].predict_proba(new_test[features])[:,1]
 
@@ -590,4 +591,49 @@ class custom_transformer():
 #------------------------------------------------------------------------------------------------
 
 class convex_combination():
-    pass
+    def __init__(self, feature_list, tag):
+        self.feature_list = feature_list
+        self.tag = tag
+
+
+    def fit_transform(self, train):
+        pass
+    def transform(self, test):
+        pass
+
+    def get_column_list(self):
+        return [tag]
+
+#------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------
+
+class PCA_transformer():
+    def __init__(self, feature_list, n_target, tag):
+        self.feature_list = feature_list
+        self.n_target = n_target
+        self.tag = tag
+        
+        self.columns = ["{tag}_{i}".format(tag = tag, i = i) for i in range(n_target)]
+        
+    def fit_transform(self, train):
+        self.transformer = TruncatedSVD(n_components = self.n_target)
+        
+        data = self.transformer.fit_transform(train[self.feature_list])
+        
+        extra_train = pd.DataFrame(index = train.index, columns = self.columns, data = data)
+        
+        new_train = pd.concat([train, extra_train], axis = 1)
+        
+        return new_train
+    
+    def transform(self, test):
+        data = self.transformer.transform(test[self.feature_list])
+        
+        extra_test = pd.DataFrame(index = test.index, columns = self.columns, data = data)
+        
+        new_test = pd.concat([test, extra_test], axis = 1)
+        
+        return new_test
+        
+    def get_column_list(self):
+        return self.columns
