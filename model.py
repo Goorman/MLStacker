@@ -44,10 +44,10 @@ class Execution_Graph():
 
     def remove_step(self, step_tag):
         if step_tag not in self.tags_set:
-            raise "Trying to remove undefined step {tag}".format(tag = step_tag)
+            raise Exception("Trying to remove undefined step {tag}".format(tag = step_tag))
             
         if len(self.desc_dict[step_tag]) != 0:
-            raise "Trying to remove step {tag} with nonzero amount of dependancies".format(tag = step_tag)
+            raise Exception("Trying to remove step {tag} with nonzero amount of dependancies".format(tag = step_tag))
 
         for asc in self.asc_dict[step_tag]:
             self.desc_dict[asc].remove(step_tag)
@@ -101,6 +101,10 @@ class Model():
         self.target = target
     
     def add_step(self, *args, **kvargs):
+        #TODO: Tracking dependancies based on feature list
+        #TODO: Rework onehot encoder based on sklearn.DictVectoriser 
+        #TODO: to make it possible to know all resultant columns beforehand
+        #TODO: Make sure to only make transformers that know its columns beforehand
         self.EG.add_step(*args, **kvargs)
 
     def remove_step(self, tag):
