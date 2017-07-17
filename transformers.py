@@ -10,6 +10,8 @@ from tqdm import tqdm_notebook
 from tqdm import tqdm
 from lightgbm import LGBMClassifier
 from sklearn.decomposition import TruncatedSVD
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 
 #------------------------------------------------------------------------------------------------
@@ -60,7 +62,7 @@ class logreg_stacking():
         
     def fit_transform(self, train):
         #TODO:folding and stacking
-        kfold = StratifiedKFold(n_splits = self.fold_number, shuffle = True)
+        kfold = StratifiedKFold(n_splits = self.fold_number, shuffle = True, random_state = 47)
         cv = list(kfold.split(train.index, train[self.target]))
 
         stack_feature_list = []
@@ -134,7 +136,7 @@ class xgb_stacking():
 
     def fit_transform(self, train):
         #TODO:folding and stacking
-        kfold = StratifiedKFold(n_splits = self.fold_number, shuffle = True)
+        kfold = StratifiedKFold(n_splits = self.fold_number, shuffle = True, random_state = 47)
         cv = list(kfold.split(train.index, train[self.target]))
 
         stack_feature_list = []
@@ -212,7 +214,7 @@ class lgbm_stacking():
 
     def fit_transform(self, train):
         #TODO:folding and stacking
-        kfold = StratifiedKFold(n_splits = self.fold_number, shuffle = True)
+        kfold = StratifiedKFold(n_splits = self.fold_number, shuffle = True, random_state = 47)
         cv = list(kfold.split(train.index, train[self.target]))
 
         stack_feature_list = []
@@ -349,7 +351,7 @@ class multiplication_transformer():
     def fit_transform(self, train):
         new_train = train.copy()
 
-        for feature_name in self.__info__:
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} train".format(tag = self.tag)):
             features, degrees = self.__info__[feature_name]["features"], self.__info__[feature_name]["degrees"]
             new_train[feature_name] = np.power(new_train[features].astype(np.float), degrees).prod(axis = 1)
 
@@ -358,7 +360,7 @@ class multiplication_transformer():
     def transform(self, test):
         new_test = test.copy()
         
-        for feature_name in self.__info__:
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} test".format(tag = self.tag)):
             features, degrees = self.__info__[feature_name]["features"], self.__info__[feature_name]["degrees"]
             new_test[feature_name] = np.power(new_test[features].astype(np.float), degrees).prod(axis = 1)
 
@@ -366,6 +368,114 @@ class multiplication_transformer():
 
     def get_column_list(self):
         return self.__info__.keys()
+
+#------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------
+
+class logicaland_transformer():
+    def __init__(self, feature_list, feature_num, tag):
+        self.feature_list = feature_list
+        self.feature_num = feature_num
+        self.tag = tag
+        self.__info__ = dict()
+
+        i = 1
+        for features in combinations(self.feature_list, self.feature_num):
+            features = list(features)
+            feature_name = "{tag}_{index}".format(tag = self.tag, index = str(i)) 
+            self.__info__[feature_name] = {"features":features} 
+            i += 1
+
+    def fit_transform(self, train):
+        new_train = train.copy()
+
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} train".format(tag = self.tag)):
+            features = self.__info__[feature_name]["features"]
+            new_train[feature_name] = new_train[features].min(axis = 1)
+
+        return new_train
+
+    def transform(self, test):
+        new_test = test.copy()
+        
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} test".format(tag = self.tag)):
+            features = self.__info__[feature_name]["features"]
+            new_test[feature_name] = new_test[features].min(axis = 1)
+
+        return new_test
+
+    def get_column_list(self):
+        return self.__info__.keys()
+
+class logicalor_transformer():
+    def __init__(self, feature_list, feature_num, tag):
+        self.feature_list = feature_list
+        self.feature_num = feature_num
+        self.tag = tag
+        self.__info__ = dict()
+
+        i = 1
+        for features in combinations(self.feature_list, self.feature_num):
+            features = list(features)
+            feature_name = "{tag}_{index}".format(tag = self.tag, index = str(i)) 
+            self.__info__[feature_name] = {"features":features} 
+            i += 1
+
+    def fit_transform(self, train):
+        new_train = train.copy()
+
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} train".format(tag = self.tag)):
+            features = self.__info__[feature_name]["features"]
+            new_train[feature_name] = new_train[features].max(axis = 1)
+
+        return new_train
+
+    def transform(self, test):
+        new_test = test.copy()
+        
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} test".format(tag = self.tag)):
+            features = self.__info__[feature_name]["features"]
+            new_test[feature_name] = new_test[features].max(axis = 1)
+
+        return new_test
+
+    def get_column_list(self):
+        return self.__info__.keys()
+
+class logicalxor_transformer():
+    def __init__(self, feature_list, tag):
+        self.feature_list = feature_list
+        self.tag = tag
+        self.__info__ = dict()
+
+        i = 1
+        for features in combinations(self.feature_list, 2):
+            features = list(features)
+            feature_name = "{tag}_{index}".format(tag = self.tag, index = str(i)) 
+            self.__info__[feature_name] = {"features":features} 
+            i += 1
+
+    def fit_transform(self, train):
+        new_train = train.copy()
+
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} train".format(tag = self.tag)):
+            features = self.__info__[feature_name]["features"]
+            new_train[feature_name] = new_train[features].sum(axis = 1) % 2
+
+        return new_train
+
+    def transform(self, test):
+        new_test = test.copy()
+        
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} test".format(tag = self.tag)):
+            features = self.__info__[feature_name]["features"]
+            new_test[feature_name] = new_test[features].sum(axis = 1) % 2
+
+        return new_test
+
+    def get_column_list(self):
+        return self.__info__.keys()
+
 
 #------------------------------------------------------------------------------------------------
 #------------------------------------------------------------------------------------------------
@@ -429,12 +539,12 @@ class additive_stacking():
     def fit_transform(self, train):
         new_train = train.copy()
 
-        kfold = StratifiedKFold(n_splits = self.fold_number, shuffle = True)
+        kfold = StratifiedKFold(n_splits = self.fold_number, shuffle = True, random_state = 47)
         cv = list(kfold.split(train.index, train[self.target]))
 
         self.transformers = dict()
 
-        for feature_name in tqdm_notebook(self.__info__):
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} train".format(tag = self.tag)):
             cur_feature_list = self.__info__[feature_name]
 
             stack_feature_list = []
@@ -466,7 +576,7 @@ class additive_stacking():
     def transform(self, test):
         new_test = test.copy()
         
-        for feature_name in tqdm_notebook(self.__info__):
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} test".format(tag = self.tag)):
             features = self.__info__[feature_name]
             new_test[feature_name] = self.transformers[feature_name].predict_proba(new_test[features])[:,1]
 
@@ -496,7 +606,7 @@ class additive_featuring():
 
         self.transformers = dict()
 
-        for feature_name in tqdm_notebook(self.__info__):
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} train".format(tag = self.tag)):
             cur_feature_list = self.__info__[feature_name]
 
             stack_feature_list = []
@@ -512,7 +622,7 @@ class additive_featuring():
     def transform(self, test):
         new_test = test.copy()
         
-        for feature_name in tqdm_notebook(self.__info__):
+        for feature_name in tqdm_notebook(self.__info__, desc = "{tag} test".format(tag = self.tag)):
             features = self.__info__[feature_name]
             new_test[feature_name] = self.transformers[feature_name].predict_proba(new_test[features])[:,1]
 
@@ -613,7 +723,7 @@ class PCA_transformer():
         self.n_target = n_target
         self.tag = tag
         
-        self.columns = ["{tag}_{i}".format(tag = tag, i = i) for i in range(n_target)]
+        self.columns = ["{tag}_{i}".format(tag = tag, i = i) for i in range(1, n_target+1)]
         
     def fit_transform(self, train):
         self.transformer = TruncatedSVD(n_components = self.n_target)
@@ -637,3 +747,88 @@ class PCA_transformer():
         
     def get_column_list(self):
         return self.columns
+
+#------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------
+
+class LDA_transformer():
+    def __init__(self, feature_list, target, n_target, tag):
+        self.feature_list = feature_list
+        self.target = target
+        self.n_target = n_target
+        self.tag = tag
+        
+        self.columns = ["{tag}_{i}".format(tag = tag, i = i) for i in range(1, n_target+1)]
+        
+    def fit_transform(self, train):
+        self.transformer = LinearDiscriminantAnalysis(n_components = self.n_target)
+        
+        data = self.transformer.fit_transform(train[self.feature_list], train[self.target])
+       
+        extra_train = pd.DataFrame(index = train.index, columns = self.columns, data = data)
+        
+        new_train = pd.concat([train, extra_train], axis = 1)
+        
+        return new_train
+    
+    def transform(self, test):
+        data = self.transformer.transform(test[self.feature_list])
+        
+        extra_test = pd.DataFrame(index = test.index, columns = self.columns, data = data)
+        
+        new_test = pd.concat([test, extra_test], axis = 1)
+        
+        return new_test
+        
+    def get_column_list(self):
+        return self.columns
+
+#------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------
+
+
+class KNN_stacking():
+    def __init__(self, feature_list, target, clf_params, fold_number, tag):
+        self.feature_list = feature_list
+        self.fold_number = fold_number
+        self.tag = tag
+        self.target = target
+        self.clf_params = clf_params
+
+    def fit_transform(self, train):
+        kfold = StratifiedKFold(n_splits = self.fold_number, shuffle = True, random_state = 47)
+        cv = list(kfold.split(train.index, train[self.target]))
+
+        stack_feature_list = []
+
+        for i, fold in tqdm_notebook(list(enumerate(cv)), desc = "{tag} folds".format(tag = self.tag)):
+            fold_X_train = train[self.feature_list].iloc[fold[0]]
+            fold_Y_train = train[self.target].iloc[fold[0]]
+            fold_X_test = train[self.feature_list].iloc[fold[1]]
+            fold_Y_test = train[self.target].iloc[fold[1]]
+
+            fold_transformer = KNeighborsClassifier(**self.clf_params)
+
+            fold_transformer.fit(fold_X_train, fold_Y_train)
+
+            fold_y_predict = fold_transformer.predict_proba(fold_X_test)[:,1]
+            
+            stack_feature_list.append(pd.Series(index = fold[1], data = fold_y_predict))
+
+        new_feature = pd.concat(stack_feature_list)
+
+        train[self.tag] = new_feature
+
+        self.transformer = KNeighborsClassifier(**self.clf_params)
+        
+        self.transformer.fit(train[self.feature_list], train[self.target])
+        
+        return train
+
+    def transform(self, test):
+        test[self.tag] = self.transformer.predict_proba(test[self.feature_list])[:,1]
+        
+        return test
+
+    def get_column_list(self):
+        return [self.tag]
